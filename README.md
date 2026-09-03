@@ -4,7 +4,7 @@ A single-page, client-side tool that converts ESRI Shapefiles to KML — in
 bulk. Select a whole folder of shapefiles, individual SHP files, or drop in a
 ZIP and get back one KML per shapefile, packaged into a single ZIP.
 
-**[Try SHP → KML Batch Converter](https://shp-to-kml.vercel.app/)**
+**[Try SHP → KML Batch Converter](https://shptokml.vercel.app/)**
 
 **Everything runs in the browser.** No files are uploaded to a server; the
 conversion happens locally using [shpjs](https://github.com/calvinmetcalf/shapefile-js)
@@ -31,7 +31,7 @@ and [tokml](https://github.com/mapbox/tokml).
 
 You can use the live application here:
 
-**[SHP → KML Batch Converter](https://shp-to-kml.vercel.app/)**
+**[SHP → KML Batch Converter](https://shptokml.vercel.app/)**
 
 To run it locally, just open `index.html` in a browser — there's no build step.
 For example, using a static file server:
