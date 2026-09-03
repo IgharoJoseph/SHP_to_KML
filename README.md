@@ -1,4 +1,4 @@
-# [SHP → KML Batch Converter](https://shp-to-kml.vercel.app/)
+# [SHP → KML Batch Converter](https://shptokml.vercel.app/)
 
 A single-page, client-side tool that converts ESRI Shapefiles to KML — in
 bulk. Select a whole folder of shapefiles, individual SHP files, or drop in a
