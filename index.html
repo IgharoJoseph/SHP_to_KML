@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SHP → KML Batch Converter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <section class="card">
+      <div class="head">
+        <div class="logo">GIS</div>
+        <div>
+          <div class="eyebrow">GIS TOOL</div>
+          <div class="title">SHP <span>→</span> KML Batch Converter</div>
+        </div>
+      </div>
+
+      <p class="intro">
+        Select an entire folder containing many shapefiles, or upload a ZIP.
+        Each SHP is paired with its matching SHX, DBF, PRJ and optional CPG,
+        then converted to its own KML.
+      </p>
+
+      <div id="drop" class="drop" tabindex="0">
+        <input id="folder" type="file" webkitdirectory directory multiple hidden>
+        <input id="input" type="file" accept=".zip,.shp,.shx,.dbf,.prj,.cpg" multiple hidden>
+        <div class="up">↑</div>
+        <h2>Drop an SHP folder or ZIP here</h2>
+        <p>Or choose a whole folder / ZIP / shapefile components.</p>
+        <button id="folderBtn" class="choose" type="button">Select SHP folder</button>
+        <button id="zipBtn" class="choose" type="button">Select ZIP / files</button>
+      </div>
+
+      <div id="files" class="files hidden"></div>
+
+      <div class="actions">
+        <button id="convert" class="primary" disabled>Convert all SHPs to KML</button>
+        <button id="clear" class="choose" disabled>Clear</button>
+      </div>
+
+      <div id="progress" class="progress hidden">
+        <div class="pl">
+          <span id="status">Preparing…</span>
+          <span id="pct">0%</span>
+        </div>
+        <div class="track"><div id="bar" class="bar"></div></div>
+      </div>
+
+      <div id="result" class="result hidden"></div>
+
+      <div class="note">
+        <b>Output:</b> one KML per SHP, packaged into a standard ZIP.
+        <b>CRS:</b> include the PRJ file.
+        <b>Privacy:</b> conversion runs in your browser.
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Conversion libraries, loaded from CDN -->
+<script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
+<script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<!-- App logic -->
+<script src="script.js"></script>
+</body>
+</html>
