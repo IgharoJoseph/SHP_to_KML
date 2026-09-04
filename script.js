@@ -1,358 +1,364 @@
-const EXT = [".shp", ".shx", ".dbf", ".prj", ".cpg"];
+// SHP -> KML batch converter
+// Everything below runs entirely in the browser: shapefiles are never
+// uploaded anywhere, they're read, converted, and zipped locally.
+//
+// Flow: user provides ZIP file(s) -> we inspect each ZIP and group its
+// contents into shapefile datasets -> each dataset is validated (all parts
+// present, at least one feature) -> the user sees that report before
+// anything is converted -> only datasets marked "ready" get converted.
 
-const $ = id => document.getElementById(id);
+const SHAPEFILE_EXTENSIONS = [".shp", ".shx", ".dbf", ".prj", ".cpg"];
+const REQUIRED_EXTENSIONS = ["shp", "shx", "dbf"];
+
+// --- Element references ---
+const $ = (id) => document.getElementById(id);
 
 const drop = $("drop");
-const folderInput = $("folder");
-const shpInput = $("shpFiles");
-const zipInput = $("zip");
+const fileInput = $("input");
 const filesPanel = $("files");
 const convertBtn = $("convert");
 const clearBtn = $("clear");
 const progress = $("progress");
-const status = $("status");
-const pct = $("pct");
-const bar = $("bar");
+const statusLabel = $("status");
+const percentLabel = $("pct");
+const progressBar = $("bar");
 const result = $("result");
 
-let selected = [];
-let selectionType = null;
+// Datasets built from the currently selected ZIP(s), after validation.
+// Each entry: { name, shp, shx, dbf, prj, cpg, status: "ready"|"missing"|"empty", detail }
+let datasets = [];
 
-// Input buttons
-$("folderBtn").onclick = e => {
+// --- Wiring up the UI ---
+
+$("zipBtn").onclick = (e) => {
   e.stopPropagation();
-  folderInput.click();
+  fileInput.click();
 };
 
-$("shpBtn").onclick = e => {
-  e.stopPropagation();
-  shpInput.click();
+fileInput.onchange = () => handleSelection([...fileInput.files]);
+
+drop.onclick = (e) => {
+  if (e.target === drop) fileInput.click();
 };
 
-$("zipBtn").onclick = e => {
-  e.stopPropagation();
-  zipInput.click();
-};
-
-// File selection
-folderInput.onchange = () => {
-  selected = [...folderInput.files];
-  selectionType = "folder";
-  renderFiles();
-};
-
-shpInput.onchange = () => {
-  selected = [...shpInput.files];
-  selectionType = "shp";
-  renderFiles();
-};
-
-zipInput.onchange = () => {
-  selected = [...zipInput.files];
-  selectionType = "zip";
-  renderFiles();
-};
-
-// Drop area
-drop.onclick = e => {
-  if (e.target === drop) folderInput.click();
-};
-
-["dragenter", "dragover"].forEach(type => {
-  drop.addEventListener(type, e => {
+["dragenter", "dragover"].forEach((eventName) =>
+  drop.addEventListener(eventName, (e) => {
     e.preventDefault();
     drop.classList.add("over");
-  });
-});
+  })
+);
 
-["dragleave", "drop"].forEach(type => {
-  drop.addEventListener(type, e => {
+["dragleave", "drop"].forEach((eventName) =>
+  drop.addEventListener(eventName, (e) => {
     e.preventDefault();
     drop.classList.remove("over");
-  });
+  })
+);
+
+drop.addEventListener("drop", (e) => {
+  handleSelection([...e.dataTransfer.files]);
 });
 
-drop.addEventListener("drop", e => {
-  selected = [...e.dataTransfer.files];
-  selectionType = detectType(selected);
-  renderFiles();
-});
+clearBtn.onclick = resetAll;
+convertBtn.onclick = runConversion;
 
-// Clear
-clearBtn.onclick = () => {
-  selected = [];
-  selectionType = null;
-
-  folderInput.value = "";
-  shpInput.value = "";
-  zipInput.value = "";
-
-  renderFiles();
+function resetAll() {
+  datasets = [];
+  fileInput.value = "";
+  filesPanel.className = "files hidden";
+  filesPanel.innerHTML = "";
+  convertBtn.disabled = true;
+  clearBtn.disabled = true;
   result.className = "result hidden";
   progress.className = "progress hidden";
   setProgress(0, "");
-};
+}
 
-convertBtn.onclick = convert;
+// --- Handling a new selection: reject non-ZIPs, then validate ---
 
-// UI
-function renderFiles() {
-  if (!selected.length) {
-    filesPanel.className = "files hidden";
-    convertBtn.disabled = true;
-    clearBtn.disabled = true;
+async function handleSelection(incomingFiles) {
+  if (!incomingFiles.length) return;
+
+  const nonZips = incomingFiles.filter((f) => !/\.zip$/i.test(f.name));
+  if (nonZips.length) {
+    resetAll();
+    showError(
+      "Only ZIP files are accepted. " +
+        `Please zip up your shapefile(s) first (rejected: ${nonZips.map((f) => f.name).join(", ")}).`
+    );
     return;
   }
 
-  const shps = selected.filter(f => /\.shp$/i.test(f.name));
-  const zips = selected.filter(f => /\.zip$/i.test(f.name));
-
-  const source =
-    selectionType === "folder" ? "Folder" :
-    selectionType === "zip" ? "ZIP" :
-    selectionType === "shp" ? "SHP files" :
-    "Dropped files";
-
-  filesPanel.innerHTML = `
-    <div class="fh">
-      <b>${selected.length} file(s) selected</b>
-      <span>${source}</span>
-    </div>
-    ${selected.map(f => `
-      <div class="fr">
-        <span>${escapeHtml(f.webkitRelativePath || f.name)}</span>
-        <span class="size">${formatBytes(f.size)}</span>
-      </div>
-    `).join("")}
-  `;
-
-  filesPanel.className = "files";
   clearBtn.disabled = false;
-  convertBtn.disabled = !(shps.length || zips.length);
+  convertBtn.disabled = true;
+  result.className = "result hidden";
+  filesPanel.className = "files";
+  filesPanel.innerHTML = '<div class="fh"><b>Checking ZIP contents…</b></div>';
+
+  try {
+    datasets = await buildDatasetsFromZips(incomingFiles);
+    renderDatasetReport();
+  } catch (error) {
+    console.error(error);
+    resetAll();
+    showError("Couldn't read that ZIP file: " + (error.message || String(error)));
+  }
 }
 
-function detectType(files) {
-  if (files.length === 1 && /\.zip$/i.test(files[0].name)) return "zip";
-  if (files.some(f => f.webkitRelativePath)) return "folder";
-  return "shp";
-}
+// --- Reading ZIP(s) and grouping their contents into datasets ---
 
-function setProgress(value, text) {
-  bar.style.width = `${value}%`;
-  pct.textContent = `${value}%`;
-  status.textContent = text;
-}
-
-// Dataset grouping
-async function getDatasets() {
+async function buildDatasetsFromZips(zipFiles) {
   const groups = new Map();
 
-  function add(path, file) {
-    path = path.replaceAll("\\", "/");
-
-    const i = path.lastIndexOf(".");
-    if (i < 0) return;
-
-    const ext = path.slice(i).toLowerCase();
-    if (!EXT.includes(ext)) return;
-
-    const base = path.slice(0, i);
-
+  const addEntry = (path, ext, blob) => {
+    const base = path.slice(0, path.lastIndexOf("."));
     if (!groups.has(base)) {
       groups.set(base, {
-        name: path.slice(path.lastIndexOf("/") + 1, i),
+        name: base.replaceAll("/", "_"),
         shp: null,
         shx: null,
         dbf: null,
         prj: null,
-        cpg: null
+        cpg: null,
       });
     }
+    groups.get(base)[ext] = blob;
+  };
 
-    groups.get(base)[ext.slice(1)] = file;
-  }
-
-  for (const file of selected.filter(f => !/\.zip$/i.test(f.name))) {
-    add(file.webkitRelativePath || file.name, file);
-  }
-
-  for (const zipFile of selected.filter(f => /\.zip$/i.test(f.name))) {
-    const zip = await JSZip.loadAsync(zipFile);
-
-    for (const entry of Object.values(zip.files)) {
+  for (const zipFile of zipFiles) {
+    const archive = await JSZip.loadAsync(zipFile);
+    // Prefix with the source zip's name so identically-named datasets in
+    // different ZIP uploads never collide with each other either.
+    const zipPrefix = zipFile.name.replace(/\.zip$/i, "");
+    for (const entry of Object.values(archive.files)) {
       if (entry.dir) continue;
-
-      const i = entry.name.lastIndexOf(".");
-      if (i < 0) continue;
-
-      const ext = entry.name.slice(i).toLowerCase();
-      if (!EXT.includes(ext)) continue;
-
+      const ext = entry.name.slice(entry.name.lastIndexOf(".")).toLowerCase();
+      if (!SHAPEFILE_EXTENSIONS.includes(ext)) continue;
       const blob = await entry.async("blob");
-      add(entry.name, new File([blob], entry.name.split("/").pop()));
+      const fullPath = zipFiles.length > 1
+        ? `${zipPrefix}/${entry.name.replaceAll("\\", "/")}`
+        : entry.name.replaceAll("\\", "/");
+      addEntry(fullPath, ext.slice(1), blob);
     }
   }
 
-  return [...groups.values()].filter(g => g.shp && g.shx && g.dbf);
+  // Classify each group as ready / missing parts / empty (0 features)
+  const results = [];
+  for (const group of groups.values()) {
+    const missing = REQUIRED_EXTENSIONS.filter((ext) => !group[ext]);
+    if (missing.length) {
+      results.push({
+        ...group,
+        status: "missing",
+        detail: `Missing ${missing.map((e) => "." + e).join(", ")}`,
+      });
+      continue;
+    }
+
+    const recordCount = await readDbfRecordCount(group.dbf);
+    if (recordCount === 0) {
+      results.push({ ...group, status: "empty", detail: "0 features (empty shapefile)" });
+      continue;
+    }
+
+    results.push({ ...group, status: "ready", detail: `${recordCount} feature(s)` });
+  }
+
+  return results;
 }
 
-// Conversion
-async function convert() {
+// Reads the record count straight from a DBF file's header (bytes 4-7,
+// little-endian uint32), per the DBF file format spec. This lets us flag
+// empty shapefiles before attempting a full conversion.
+async function readDbfRecordCount(dbfBlob) {
+  const buffer = await dbfBlob.arrayBuffer();
+  const view = new DataView(buffer);
+  return view.getUint32(4, true);
+}
+
+// --- Pre-conversion report ---
+
+function renderDatasetReport() {
+  if (!datasets.length) {
+    filesPanel.innerHTML = '<div class="fh"><b>No shapefiles found in that ZIP.</b></div>';
+    convertBtn.disabled = true;
+    return;
+  }
+
+  const readyCount = datasets.filter((d) => d.status === "ready").length;
+
+  const header =
+    `<div class="fh"><b>${datasets.length} dataset(s) found</b>` +
+    `<span>${readyCount} ready to convert</span></div>`;
+
+  const rows = datasets
+    .map((d) => {
+      const badge =
+        d.status === "ready" ? "✓" : d.status === "empty" ? "⚠" : "✗";
+      return (
+        `<div class="fr"><span>${badge} ${escapeHtml(d.name)}</span>` +
+        `<span class="size">${escapeHtml(d.detail)}</span></div>`
+      );
+    })
+    .join("");
+
+  filesPanel.innerHTML = header + rows;
+  convertBtn.disabled = readyCount === 0;
+}
+
+function setProgress(percent, statusText) {
+  progressBar.style.width = percent + "%";
+  percentLabel.textContent = percent + "%";
+  statusLabel.textContent = statusText;
+}
+
+// --- Conversion ---
+
+async function runConversion() {
+  const ready = datasets.filter((d) => d.status === "ready");
+
   convertBtn.disabled = true;
   clearBtn.disabled = true;
   result.className = "result hidden";
   progress.className = "progress";
+  setProgress(3, "Starting conversion…");
 
   try {
-    if (typeof shp !== "function" || typeof tokml !== "function" || !window.JSZip) {
+    if (typeof shp !== "function" || typeof tokml !== "function" || typeof JSZip === "undefined") {
       throw new Error("A required library did not load. Refresh the page.");
     }
-
-    setProgress(3, "Finding SHP datasets…");
-
-    const datasets = await getDatasets();
-
-    if (!datasets.length) {
-      throw new Error(
-        "No complete SHP datasets found. Every SHP needs matching SHX and DBF files. Use a complete folder or ZIP for automatic pairing."
-      );
+    if (!ready.length) {
+      throw new Error("No ready datasets to convert.");
     }
 
-    const kmlFiles = [];
-
-    for (let i = 0; i < datasets.length; i++) {
-      const d = datasets[i];
-
-      setProgress(
-        8 + Math.round(i / datasets.length * 78),
-        `Converting ${d.name} (${i + 1} of ${datasets.length})…`
-      );
-
-      const data = await shp({
-        shp: await d.shp.arrayBuffer(),
-        shx: await d.shx.arrayBuffer(),
-        dbf: await d.dbf.arrayBuffer(),
-        prj: d.prj ? await d.prj.arrayBuffer() : undefined,
-        cpg: d.cpg ? await d.cpg.arrayBuffer() : undefined
-      });
-
-      const collections = Array.isArray(data) ? data : [data];
-
-      collections.forEach((fc, index) => {
-        if (!fc?.features?.length) return;
-
-        const suffix = collections.length > 1 ? `_${index + 1}` : "";
-
-        kmlFiles.push({
-          name: `${safeName(d.name)}${suffix}.kml`,
-          data: tokml(fc)
-        });
-      });
-    }
-
+    const { kmlFiles, failures } = await convertDatasetsToKml(ready);
     if (!kmlFiles.length) {
-      throw new Error("The SHPs were read, but no features were found.");
+      throw new Error(
+        "None of the SHP datasets could be converted." + (failures.length ? " " + failures[0].message : "")
+      );
     }
 
     setProgress(92, "Creating ZIP…");
+    const zipBlob = await buildZip(kmlFiles);
 
-    const zip = new JSZip();
-
-    kmlFiles.forEach(file => zip.file(file.name, file.data));
-
-    const blob = await zip.generateAsync(
-      {
-        type: "blob",
-        compression: "DEFLATE",
-        compressionOptions: { level: 6 }
-      },
-      metadata => setProgress(
-        92 + Math.round(metadata.percent * 0.08),
-        "Creating ZIP…"
-      )
-    );
-
-    const filename = outputName(datasets);
-
-    const url = URL.createObjectURL(blob);
-
-    result.className = "result ok";
-    result.innerHTML = `
-      <b>✓ Conversion complete</b>
-      <div>${kmlFiles.length} KML file(s) created.</div>
-      <a class="download" href="${url}" download="${escapeHtml(filename)}">
-        Download KML ZIP
-      </a>
-    `;
-
+    showSuccess(kmlFiles.length, zipBlob, failures);
     setProgress(100, "Complete");
-
   } catch (error) {
     console.error(error);
-
-    result.className = "result err";
-    result.textContent = error.message || String(error);
-
+    showError(error.message || String(error));
     setProgress(0, "Conversion failed");
+  } finally {
+    convertBtn.disabled = false;
+    clearBtn.disabled = false;
   }
-
-  convertBtn.disabled = false;
-  clearBtn.disabled = false;
 }
 
-// Output filename
-function outputName(datasets) {
-  let name;
+// Converts each dataset with shpjs, then each resulting GeoJSON
+// FeatureCollection to a KML string with tokml.
+// A failure on one dataset is caught and recorded rather than aborting
+// the whole batch, so one bad SHP doesn't block the rest from converting.
+async function convertDatasetsToKml(readyDatasets) {
+  const kmlFiles = [];
+  const failures = [];
 
-  if (selectionType === "folder") {
-    const path = selected[0]?.webkitRelativePath || "";
-    name = path.split("/")[0] || datasets[0].name;
-  } else if (selectionType === "zip") {
-    name = selected[0].name.replace(/\.zip$/i, "");
-  } else if (selectionType === "shp") {
-    name = datasets.length === 1 ? datasets[0].name : "SHP_Batch";
-  } else {
-    const zip = selected.find(f => /\.zip$/i.test(f.name));
+  for (let i = 0; i < readyDatasets.length; i++) {
+    const dataset = readyDatasets[i];
+    setProgress(
+      8 + Math.round((i / readyDatasets.length) * 78),
+      `Converting ${dataset.name} (${i + 1} of ${readyDatasets.length})…`
+    );
 
-    if (zip) {
-      name = zip.name.replace(/\.zip$/i, "");
-    } else {
-      name = datasets.length === 1 ? datasets[0].name : "SHP_Batch";
+    try {
+      const geoData = await shp({
+        shp: await dataset.shp.arrayBuffer(),
+        shx: await dataset.shx.arrayBuffer(),
+        dbf: await dataset.dbf.arrayBuffer(),
+        prj: dataset.prj ? await dataset.prj.arrayBuffer() : undefined,
+        cpg: dataset.cpg ? await dataset.cpg.arrayBuffer() : undefined,
+      });
+
+      // shpjs returns either a single FeatureCollection or an array of them
+      // (e.g. when a shapefile mixes multiple geometry types)
+      const collections = Array.isArray(geoData) ? geoData : [geoData];
+      let addedAny = false;
+
+      collections.forEach((featureCollection, index) => {
+        if (!featureCollection?.features?.length) return;
+        const suffix = collections.length > 1 ? `_${index + 1}` : "";
+        kmlFiles.push({
+          name: `${sanitizeFileName(dataset.name)}${suffix}.kml`,
+          data: tokml(featureCollection),
+        });
+        addedAny = true;
+      });
+
+      if (!addedAny) {
+        failures.push({
+          name: dataset.name,
+          message: `Dataset "${dataset.name}" had no features to convert.`,
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to convert dataset "${dataset.name}":`, error);
+      failures.push({
+        name: dataset.name,
+        message:
+          `Dataset "${dataset.name}" could not be converted. The SHP data could not be read. ` +
+          "Check that the SHP, SHX and DBF files belong to the same dataset and are not corrupt.",
+      });
     }
   }
 
-  const d = new Date();
-
-  const timestamp =
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
-
-  return `${safeName(name)}_KML_${timestamp}.zip`;
+  return { kmlFiles, failures };
 }
 
-// Utilities
-function safeName(name) {
-  return String(name)
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-    .trim() || "converted";
+async function buildZip(kmlFiles) {
+  const zip = new JSZip();
+  kmlFiles.forEach((file) => zip.file(file.name, file.data));
+
+  return zip.generateAsync(
+    { type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } },
+    (metadata) => setProgress(92 + Math.round(metadata.percent * 0.08), "Creating ZIP…")
+  );
 }
 
-function pad(n) {
-  return String(n).padStart(2, "0");
+// --- Result banner ---
+
+function showSuccess(kmlCount, zipBlob, failures = []) {
+  const downloadUrl = URL.createObjectURL(zipBlob);
+  const hasFailures = failures.length > 0;
+
+  result.className = hasFailures ? "result err" : "result ok";
+  let html =
+    `<b>${hasFailures ? "⚠ Conversion finished with some errors" : "✓ Conversion complete"}</b>` +
+    `<div>${kmlCount} KML file(s) created.</div>`;
+
+  if (hasFailures) {
+    html +=
+      `<div style="margin-top:8px">${failures.length} dataset(s) failed:</div>` +
+      "<ul>" +
+      failures.map((f) => `<li>${escapeHtml(f.message)}</li>`).join("") +
+      "</ul>";
+  }
+
+  html += `<a class="download" href="${downloadUrl}" download="kml_conversion_results.zip">Download KML ZIP</a>`;
+  result.innerHTML = html;
+  result.classList.remove("hidden");
 }
 
-function formatBytes(bytes) {
-  const units = ["B", "KB", "MB", "GB"];
-  const i = bytes ? Math.floor(Math.log(bytes) / Math.log(1024)) : 0;
-  return `${(bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
+function showError(message) {
+  result.className = "result err";
+  result.textContent = message;
+  result.classList.remove("hidden");
+}
+
+// --- Small utilities ---
+
+function sanitizeFileName(name) {
+  return String(name).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim() || "converted";
 }
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  }[c]));
+  const escapes = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+  return String(str).replace(/[&<>"']/g, (c) => escapes[c]);
 }

@@ -20,7 +20,19 @@ and [tokml](https://github.com/mapbox/tokml).
 
 - `index.html` — page markup
 - `style.css` — styling
-- `script.js` — app logic (file selection, grouping shapefile parts, conversion, zipping)
+- `script.js` — app logic: reads ZIP(s), groups shapefile parts, validates each dataset, then converts
+
+## How validation works
+
+Only `.zip` files are accepted — anything else is rejected immediately with
+an explanation. Each ZIP is inspected before conversion starts:
+
+- Shapefile parts inside it are grouped by matching base name
+- A dataset is **ready** if it has `.shp`, `.shx`, and `.dbf`, and the `.dbf`
+  header reports at least one record
+- A dataset is flagged **missing parts** or **empty (0 features)** instead,
+  and shown as such in the list — it's excluded from conversion, and
+  everything else still proceeds
 
 ## Usage
 

@@ -18,42 +18,44 @@ body {
 
 .card {
   width: min(820px, 100%);
-  padding: 34px;
-  background: #fff;
+  background: white;
   border: 1px solid #dbe2ea;
   border-radius: 18px;
+  padding: 34px;
   box-shadow: 0 18px 55px #1c2a3d18;
 }
 
+/* Header */
+
 .head {
   display: flex;
-  align-items: center;
   gap: 14px;
+  align-items: center;
 }
 
 .logo {
   width: 52px;
   height: 52px;
-  display: grid;
-  place-items: center;
+  border-radius: 13px;
   background: #172033;
   color: #fff;
-  border-radius: 13px;
-  font-size: 11px;
+  display: grid;
+  place-items: center;
   font-weight: 800;
+  font-size: 11px;
 }
 
 .eyebrow {
-  color: #718096;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: .14em;
+  color: #718096;
+  letter-spacing: 0.14em;
 }
 
 .title {
   font-size: 31px;
   font-weight: 800;
-  letter-spacing: -.04em;
+  letter-spacing: -0.04em;
 }
 
 .title span {
@@ -61,17 +63,19 @@ body {
 }
 
 .intro {
-  margin: 18px 0 24px;
   color: #607084;
   line-height: 1.55;
+  margin: 18px 0 24px;
 }
 
+/* Drop zone */
+
 .drop {
+  border: 2px dashed #b9c5d3;
+  border-radius: 15px;
   padding: 32px 20px;
   text-align: center;
   background: #fafbfd;
-  border: 2px dashed #b9c5d3;
-  border-radius: 15px;
   cursor: pointer;
 }
 
@@ -81,45 +85,36 @@ body {
 }
 
 .up {
+  margin: auto auto 12px;
   width: 44px;
   height: 44px;
-  margin: auto auto 12px;
+  border-radius: 50%;
+  background: #e8edf3;
   display: grid;
   place-items: center;
-  background: #e8edf3;
-  border-radius: 50%;
   font-size: 24px;
   font-weight: 700;
 }
 
 .drop h2 {
-  margin: 0 0 8px;
   font-size: 18px;
+  margin: 0 0 8px;
 }
 
 .drop p {
-  margin: 0 0 16px;
-  color: #778599;
   font-size: 13px;
+  color: #778599;
+  margin: 0 0 16px;
 }
 
-.input-actions,
-.actions {
-  display: flex;
-  gap: 10px;
-}
+/* Buttons */
 
-.input-actions {
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-button,
 .choose,
+button,
 .download {
-  padding: 12px 17px;
   border: 0;
   border-radius: 10px;
+  padding: 12px 17px;
   font: inherit;
   font-weight: 750;
   cursor: pointer;
@@ -131,49 +126,57 @@ button,
 }
 
 .primary {
-  flex: 1;
   background: #172033;
   color: #fff;
+  flex: 1;
 }
 
-button:disabled {
-  opacity: .45;
+.primary:disabled,
+.choose:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .actions {
+  display: flex;
+  gap: 10px;
   margin-top: 17px;
 }
+
+/* Selected file list */
 
 .files {
-  max-height: 250px;
   margin-top: 17px;
-  overflow-y: auto;
   border: 1px solid #e0e6ed;
   border-radius: 12px;
-}
-
-.fh,
-.fr {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 10px 14px;
-  font-size: 13px;
+  overflow: hidden;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .fh {
+  padding: 11px 14px;
   background: #f7f9fb;
   border-bottom: 1px solid #e0e6ed;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .fr {
+  padding: 9px 14px;
   border-bottom: 1px solid #edf0f3;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
 }
 
 .size {
   color: #7c8898;
 }
+
+/* Progress bar */
 
 .progress {
   margin-top: 20px;
@@ -182,24 +185,26 @@ button:disabled {
 .pl {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 7px;
-  color: #627085;
   font-size: 13px;
+  color: #627085;
+  margin-bottom: 7px;
 }
 
 .track {
   height: 8px;
-  overflow: hidden;
   background: #e8edf2;
   border-radius: 99px;
+  overflow: hidden;
 }
 
 .bar {
-  width: 0;
   height: 100%;
+  width: 0;
   background: #172033;
-  transition: .2s;
+  transition: 0.2s;
 }
+
+/* Result banner */
 
 .result {
   margin-top: 18px;
@@ -220,11 +225,13 @@ button:disabled {
 
 .download {
   display: inline-block;
-  margin-top: 10px;
   background: #172033;
   color: #fff;
   text-decoration: none;
+  margin-top: 10px;
 }
+
+/* Footnote */
 
 .note {
   margin-top: 21px;
@@ -240,23 +247,7 @@ button:disabled {
 }
 
 code {
-  padding: 2px 4px;
   background: #eef2f6;
+  padding: 2px 4px;
   border-radius: 4px;
-}
-
-@media (max-width: 640px) {
-  .card {
-    padding: 22px;
-  }
-
-  .input-actions,
-  .actions {
-    flex-direction: column;
-  }
-
-  .input-actions button,
-  .actions button {
-    width: 100%;
-  }
 }

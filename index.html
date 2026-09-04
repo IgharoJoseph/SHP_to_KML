@@ -6,138 +6,64 @@
 <title>SHP → KML Batch Converter</title>
 <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 <div class="wrap">
-  <section class="card">
-
-    <div class="head">
-      <div class="logo">GIS</div>
-
-      <div>
-        <div class="eyebrow">GIS TOOL</div>
-        <div class="title">SHP <span>→</span> KML Batch Converter</div>
-      </div>
-    </div>
-
-    <p class="intro">
-      Convert shapefiles to KML directly in your browser.
-      Select a complete folder, individual SHP files, or a ZIP archive.
-    </p>
-
-    <div id="drop" class="drop" tabindex="0">
-
-      <!-- Folder selection -->
-      <input
-        id="folder"
-        type="file"
-        webkitdirectory
-        directory
-        multiple
-        hidden
-      >
-
-      <!-- Individual SHP / component selection -->
-      <input
-        id="shpFiles"
-        type="file"
-        accept=".shp,.shx,.dbf,.prj,.cpg"
-        multiple
-        hidden
-      >
-
-      <!-- ZIP selection -->
-      <input
-        id="zip"
-        type="file"
-        accept=".zip"
-        hidden
-      >
-
-      <div class="up">↑</div>
-
-      <h2>Drop an SHP folder, files or ZIP here</h2>
-      <p>Or choose one of the options below.</p>
-
-      <div class="input-actions">
-
-        <button
-          id="folderBtn"
-          class="choose"
-          type="button"
-        >
-          Select SHP Folder
-        </button>
-
-        <button
-          id="shpBtn"
-          class="choose"
-          type="button"
-        >
-          Select SHP Files
-        </button>
-
-        <button
-          id="zipBtn"
-          class="choose"
-          type="button"
-        >
-          Select ZIP
-        </button>
-
+  <div>
+    <section class="card">
+      <div class="head">
+        <div class="logo">GIS</div>
+        <div>
+          <div class="eyebrow">GIS TOOL</div>
+          <div class="title">SHP <span>→</span> KML Batch Converter</div>
+        </div>
       </div>
 
-    </div>
+      <p class="intro">
+        Upload one or more ZIP files containing shapefiles (SHP + SHX + DBF,
+        plus optional PRJ/CPG). Each ZIP is checked for complete shapefile
+        sets before anything is converted.
+      </p>
 
-    <div id="files" class="files hidden"></div>
-
-    <div class="actions">
-      <button
-        id="convert"
-        class="primary"
-        disabled
-      >
-        Convert all SHPs to KML
-      </button>
-
-      <button
-        id="clear"
-        class="choose"
-        disabled
-      >
-        Clear
-      </button>
-    </div>
-
-    <div id="progress" class="progress hidden">
-      <div class="pl">
-        <span id="status">Preparing…</span>
-        <span id="pct">0%</span>
+      <div id="drop" class="drop" tabindex="0">
+        <input id="input" type="file" accept=".zip" multiple hidden>
+        <div class="up">↑</div>
+        <h2>Drop ZIP file(s) here</h2>
+        <p>Only .zip files are accepted.</p>
+        <button id="zipBtn" class="choose" type="button">Select ZIP file(s)</button>
       </div>
 
-      <div class="track">
-        <div id="bar" class="bar"></div>
+      <div id="files" class="files hidden"></div>
+
+      <div class="actions">
+        <button id="convert" class="primary" disabled>Convert all SHPs to KML</button>
+        <button id="clear" class="choose" disabled>Clear</button>
       </div>
-    </div>
 
-    <div id="result" class="result hidden"></div>
+      <div id="progress" class="progress hidden">
+        <div class="pl">
+          <span id="status">Preparing…</span>
+          <span id="pct">0%</span>
+        </div>
+        <div class="track"><div id="bar" class="bar"></div></div>
+      </div>
 
-    <div class="note">
-      <b>Output:</b> one KML per SHP, packaged into a ZIP.
-      <b>CRS:</b> include the PRJ file.
-      <b>Privacy:</b> conversion runs entirely in your browser.
-    </div>
+      <div id="result" class="result hidden"></div>
 
-  </section>
+      <div class="note">
+        <b>Output:</b> one KML per SHP, packaged into a standard ZIP.
+        <b>CRS:</b> include the PRJ file.
+        <b>Privacy:</b> conversion runs in your browser.
+      </div>
+    </section>
+  </div>
 </div>
 
-<!-- Conversion libraries -->
+<!-- Conversion libraries, loaded from CDN -->
 <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
 <script src="https://unpkg.com/tokml@0.4.0/tokml.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <!-- App logic -->
 <script src="script.js"></script>
-
 </body>
 </html>
